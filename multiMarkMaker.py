@@ -279,16 +279,6 @@ def getConfigFromFile(filepath):
 
     return data
 
-def cleanAdocOpts(optsDict):
-
-    cleanOpts = {}
-
-    for key in optsDict:
-        if isAllowedAdoc[key] == True:
-            cleanOpts.update({key: optsDict[key]})
-
-    return cleanOpts
-
 def getMessage(infile):
     # stdin
     if infile == '-':
@@ -320,43 +310,44 @@ def getAdocString(optsDict):
     optsList = []
 
     for key in optsDict:
-        val = optsDict[key]
-        if key == 'attribute':
-            subOptsList = []
-            for attr in val: # val will be a dict
-                if type(val[attr]) == str:
-                    subOptStr = '--' + key + '=' + attr + '=' + val[attr]
-                elif attr == True:
-                    subOptStr = '--' + key + '=' + attr
-                elif attr == False:
-                    subOptStr = '--' + key + '=' + attr + '!'
-                subOptsList.append(subOptStr)
-            optStr = ' '.join(subOptsList)
-        elif key == 'template-dir':
-            if type(val) == str:
-                optStr = '--' + key + ' ' + val
-            else:
+        if isAllowedAdoc[key] == True:
+            val = optsDict[key]
+            if key == 'attribute':
                 subOptsList = []
-                for tmp in val:
-                    subOptStr = '--' + key + ' ' + tmp
+                for attr in val: # val will be a dict
+                    if type(val[attr]) == str:
+                        subOptStr = '--' + key + '=' + attr + '=' + val[attr]
+                    elif attr == True:
+                        subOptStr = '--' + key + '=' + attr
+                    elif attr == False:
+                        subOptStr = '--' + key + '=' + attr + '!'
                     subOptsList.append(subOptStr)
                 optStr = ' '.join(subOptsList)
-        elif key == 'require':
-            if type(val) == str:
+            elif key == 'template-dir':
+                if type(val) == str:
+                    optStr = '--' + key + ' ' + val
+                else:
+                    subOptsList = []
+                    for tmp in val:
+                        subOptStr = '--' + key + ' ' + tmp
+                        subOptsList.append(subOptStr)
+                    optStr = ' '.join(subOptsList)
+            elif key == 'require':
+                if type(val) == str:
+                    optStr = '--' + key + ' ' + val
+                else:
+                    subOptsList = []
+                    for req in val:
+                        subOptStr = '--' + key + ' ' + req
+                        subOptsList.append(subOptStr)
+                    optStr = ' '.join(subOptsList)
+            elif val == True:
+                optStr = '--' + key
+            elif type(val) != bool:
                 optStr = '--' + key + ' ' + val
-            else:
-                subOptsList = []
-                for req in val:
-                    subOptStr = '--' + key + ' ' + req
-                    subOptsList.append(subOptStr)
-                optStr = ' '.join(subOptsList)
-        elif val == True:
-            optStr = '--' + key
-        elif type(val) != bool:
-            optStr = '--' + key + ' ' + val
 
-    optsList.append(optStr)
-    optString = ' '.join(optsList)
+        optsList.append(optStr)
+        optString = ' '.join(optsList)
     return optString
 
 def makePlainBody(inBody, settings):
@@ -458,13 +449,6 @@ def main():
     # convenience, makes the merging functoin below simpler to implement
     else:
         cfgFileSettings = {}
-
-    ## NOTE I have to process this dict later anyway when I make the string for
-    ## asciidoctor, why not just make the cleaning part of that function?
-    # clean Asciidoctor settings (this will need to be mpore generic if in
-    # future I ever use pandoc settings too)
-    if 'asciidoctor_options' in cfgFileSettings:
-        cfgFileSettings['asciidoctor_options'].value = cleanAdocOpts(cfgFileSettings['asciidoctor_options'].value)
 
     # make 'newSetting', by merging the cliargs and cfgFileSettings,
     # with precednece for cli args.
