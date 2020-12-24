@@ -5,22 +5,36 @@ import sys
 import toml
 import os
 import os.path
-import subprocess
-from subprocess import Popen, PIPE, STDOUT
 import itertools
 from collections import OrderedDict
+import subprocess
+from subprocess import Popen, PIPE, STDOUT
 import email
 from email.message import EmailMessage
 from email.policy import EmailPolicy, default
 
 
 class Setting():
-    def __init__(self, longName = None, shortName = None, value = None, cli = True, confFile = True):
+    def __init__(self, longName=None, shortName=None, value=None, cli=True, confFile=True):
       self.longName  = longName
       self.shortName = shortName
       self.cli       = cli        # whether an option may be specified on the cli
       self.confFile  = confFile   # whether an option may be specified in the config file
-      self.value     = value # also the default value
+      self.value     = value      # also the default value
+
+def declareSettings():
+    settings = {
+            'asciidoctor_options':        Setting(longName='asciidoctor-options',                       value='', cli=False),
+            'asciidoctor_options_string': Setting(longName='asciidoctor-options-string', shortName='a', value='', confFile=False),
+            'infile':                     Setting(longName='infile',                     shortName='i', value='-'),
+            'outfile':                    Setting(longName='outfile',                    shortName='o', value='-'),
+            'out_format':                 Setting(longName='out-format',                 shortName='t', value='commonmark'),
+            'config_file':                Setting(longName='config-file',                shortName='c', value=''), # this needs to be stored with an os.expandvars, so that '~' etc. work
+            'attach_file_references':     Setting(longName='attach-file-references',     shortName='r', value=True),
+            'attach_inline_code':         Setting(longName='attach-inline-code',         shortName='l', value=False), # make and attach files out of all hard-written code snippets
+            'in_format':                  Setting(longName='in-format',                  shortName='f', value='commonmark')
+            }
+    return settings
 
 isAllowedAdoc = {
     'failure-level': True,
@@ -48,22 +62,6 @@ isAllowedAdoc = {
     'verbose': False
     }
 
-# }}}
-
-def declareSettings():
-    settings = {
-            'asciidoctor_options':        Setting(longName = 'asciidoctor-options',                         value = '', cli=False),
-            'asciidoctor_options_string': Setting(longName = 'asciidoctor-options-string', shortName = 'a', value = '', confFile=False),
-            'infile':                     Setting(longName = 'infile',                     shortName = 'i', value = '-'),
-            'outfile':                    Setting(longName = 'outfile',                    shortName = 'o', value = '-'),
-            'out_format':                 Setting(longName = 'out-format',                 shortName = 't', value = 'commonmark'),
-            'config_file':                Setting(longName = 'config-file',                shortName = 'c', value = ''), # this needs to be stored with an os.expandvars, so that '~' etc. work
-            'attach_file_references':     Setting(longName = 'attach-file-references',     shortName = 'r', value = True),
-            'attach_inline_code':         Setting(longName = 'attach-inline-code',         shortName = 'l', value = False), # make and attach files out of all hard-written code snippets
-            'in_format':                  Setting(longName = 'in-format',                  shortName = 'f', value = 'commonmark')
-            }
-    return settings
-
 # takes a dictionary of Setting objects and return a parser for parsing them
 # out of cli args
 def makeParser(settings):
@@ -73,7 +71,6 @@ def makeParser(settings):
         setting = settings[settingKey]
 
         if setting.cli == True:
-            # is there a prepend-to-string method?
             longName  = '--' + setting.longName
             shortName = '-'  + setting.shortName
 
@@ -84,7 +81,7 @@ def makeParser(settings):
             # commandline. If it wasn't, it's value will be None, but if it was,
             # then it will have a value, even if that value happens to mathc the
             # default.
-            # This is so that cli args - even if their values happen to mathc the
+            # This is so that cli args - even if their values happen to match the
             # defaults - can overule config file values (which cause probelsm
             # because they have to be parses AFTER the commandline, because the
             # config file might be specified as an arg)
@@ -95,17 +92,10 @@ def makeParser(settings):
 # get the filepath of the config file, if any
 def getConfigFilePath():
 
-    # order of precedence for conffils:
-    # 1 config dir is deinfed, file in config dir
-    # 2 XDG_HOME is defined, file in there
-    # 3 ~/.config has file in it
-
     configFilePath = ''
 
     configFileName = 'multimarkmakerrc.toml'
 
-    # This could probably be better written with try / except
-    # This is horrible, it checks each variable twice
     if os.getenv('MULTI_MARK_CONFIG_DIR'):
         mmmDirFilePath = '/'.join([os.getenv('MULTI_MARK_CONFIG_DIR'), configFileName])
         if os.path.exists(mmmDirFilePath):
@@ -119,7 +109,7 @@ def getConfigFilePath():
             if os.path.exists(configdirFilePath):
                 configFilePath = configdirFilePath + configFileName
                 
-    # return filepath of config file if it exists, None otherwise
+    # return filepath of config file if it exists, '' otherwise
     return configFilePath
 
 # Returns a copy of the slave dictionary, such that:
@@ -142,25 +132,6 @@ def mergeUp(slave, master):
             slave.update({ key : master[key] })
     return slave
 
-# takes a string 'key', 'value' which could be a string or a list, and dictionary
-# - if value is a string, then add mergeUp 'key : value' with the dictionary
-# if value is a list, then mergeup 'key : val' for each val in the list
-# NOTES {{{
-# This could use some error checking!! 
-# How often do I use this function? Would it be easier to just put it directly
-# in the code?
-# }}}
-def parseStringOrList(key, value, dct):
-    if type(value) == str:
-        listVal = [value]
-    elif type(value) == list:
-        listVal == value
-    for val in listVal:
-        dct = mergeUp(dct, { key: val })
-    return dct
-
-# this has no error checking or exception handling. Deal with it, write your
-# config files properly.
 def parseAdocSettings(options):
 
     adocOptions = {}
@@ -265,7 +236,8 @@ def parseCfg(data):
 def mergeSettings(master, slave):
     for key in slave:
 
-        # all settings in maste with value None, overwrite with slave setting. Otherwise leave them
+        # all settings in master with value None, overwrite with slave setting.
+        # all settings in slave but not master are copied over
 
         if (key in master and master[key].value == None) or (key not in master):
             setting = slave[key]
@@ -291,12 +263,6 @@ def mergeSettings(master, slave):
 
     return master
 
-# we use different names for the settings objects need the commandline-args
-# used to set them (because commandline optios include hyperns, but dictionary
-# keys can't), but we use the same command-line name (WITH hyphens) for the
-# toml file keys. So we need to clean them...
-# (the actual implementation relies on the fact that all toml headings are the
-# longName of a Setting in the settings object)
 def getConfigFromFile(filepath):
     rawData = toml.load(filepath)
 
@@ -334,7 +300,6 @@ def getMessage(infile):
 
     return message
 
-# convert a dict of strings to a dict of settings
 def settingsFromStrings(dct):
 
     settingsDict = {}
@@ -345,15 +310,11 @@ def settingsFromStrings(dct):
 
     return settingsDict
 
-# takes a commandline command 'cmd', which assumes it takes input on stidin and
-# outputs to stdout (e.g., pandoc) and a bytestring 'text' to convert, and
-# returns the result of piping the text into the command
 def convert(cmd, text):
     pipe = Popen(cmd, stdout=PIPE, stdin=PIPE)
     body = pipe.communicate(input=text)[0]
     return body
 
-# get a string from the asciidoctor_options dictionary
 def getAdocString(optsDict):
 
     optsList = []
@@ -511,12 +472,6 @@ def main():
 
     # merge newSettings into (master) settings
     settings = mergeSettings(newSettings, settings)
-
-    # print settings (DEBUG)
-    # for setting in settings:
-    #     name = settings[setting].longName
-    #     value = settings[setting].value
-    #     print(name, ": ", value)
 
     # get the message form the relevant place
     message = getMessage(settings['infile'].value)
