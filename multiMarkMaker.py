@@ -430,8 +430,7 @@ def main():
 
     # parse the comandline arguments
     cliParser = makeParser(settings)
-    rawCliArgs = vars(cliParser.parse_args())
-    cliArgs = settingsFromStrings(rawCliArgs)
+    cliArgs = settingsFromStrings(vars(cliParser.parse_args()))
 
     # (config file has to come after cli args, because there may be a config
     # file specified in the cli args)
