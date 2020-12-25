@@ -10,7 +10,7 @@ from collections import OrderedDict
 import subprocess
 from subprocess import Popen, PIPE, STDOUT
 import email
-from email.message import EmailMessage
+from email.message import EmailMessage ,MIMEPart
 from email.policy import EmailPolicy, default
 
 
@@ -387,16 +387,13 @@ def makeHtmlBody(inBody, settings):
 
     return htmlBody
 
-def makeMultiMessage(inMessage, settings):
-
-    # inBody = get_content(inMessage)
-    inBody = inMessage.get_content()
+def makeAltMessage(inBody, settings):
 
     # correct encoding
     if isinstance(inBody, str):
         inBody = inBody.encode('utf-8')
     else:
-        inBody = inMessage.get_content(None, True)
+        inBody = inBody.get_content(None, True)
         if not isinstance(inBody, bytes):
             inBody = inBody.encode('utf-8')
 
@@ -404,14 +401,43 @@ def makeMultiMessage(inMessage, settings):
     plainBody = makePlainBody(inBody, settings).decode('utf-8')
     htmlBody  = makeHtmlBody(inBody, settings).decode('utf-8')
 
-    # make plaintext version primary part of new outMessage
-    outMessage = inMessage
-    outMessage.set_content(plainBody)
+    # make plaintext version primary part of new outPart
+    outPart = MIMEPart()
+    outPart.set_content(plainBody)
 
-    # make it a multipart email and add the htmlBody
+    # make it a multipart/alternative and add the htmlBody
     # (add_alternative() converts non-multipart messages for you)
-    outMessage.add_alternative(htmlBody, subtype='html')
+    outPart.add_alternative(htmlBody, subtype='html')
 
+    return outPart
+
+def makeMultiMessage(inMessage, settings):
+
+    # messages with attachments
+    if inMessage.get_content_type() == 'multipart/mixed':
+        inBody = (inMessage.get_body()).get_content()
+        altBody = makeAltMessage(inBody, settings)
+        
+        outMessage = EmailMessage(policy=default)    
+
+        # copy the header over to the new (out) message
+        for field in inMessage.keys():
+            outMessage[field] = inMessage[field]
+
+        # make the first part of the outgoing message the multipart/alternative
+        outMessage.attach(altBody)
+
+        # attach all the attachments
+        for attachment in inMessage.iter_attachments():
+            outMessage.attach(attachment)
+
+    # other messages
+    else:
+        inBody = inMessage.get_content()
+        altBody = makeAltMessage(inBody, settings)
+        outMessage = inMessage
+        outMessage.set_content(altBody)
+    
     return outMessage
 
 def writeMessage(message, outfile):
@@ -459,10 +485,9 @@ def main():
     # get the message form the relevant place
     message = getMessage(settings['infile'].value)
 
-    # make new message
-    multiMessage = makeMultiMessage(message, settings)
-
+    outMessage = makeMultiMessage(message, settings)
+        
     # write the message!!
-    writeMessage(multiMessage, settings['outfile'].value)
+    writeMessage(outMessage, settings['outfile'].value)
 
 main()
