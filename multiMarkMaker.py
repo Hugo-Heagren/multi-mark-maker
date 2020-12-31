@@ -313,16 +313,14 @@ def getAdocString(optsDict):
         if isAllowedAdoc[key] == True:
             val = optsDict[key]
             if key == 'attribute':
-                subOptsList = []
                 for attr in val: # val will be a dict
                     if type(val[attr]) == str:
                         subOptStr = '--' + key + '=' + attr + '=' + val[attr]
-                    elif attr == True:
+                    elif val[attr] == True:
                         subOptStr = '--' + key + '=' + attr
-                    elif attr == False:
+                    elif val[attr] == False:
                         subOptStr = '--' + key + '=' + attr + '!'
-                    subOptsList.append(subOptStr)
-                optStr = ' '.join(subOptsList)
+                    optsList.append(subOptStr)
             elif key == 'template-dir':
                 if type(val) == str:
                     optStr = '--' + key + ' ' + val
@@ -331,7 +329,7 @@ def getAdocString(optsDict):
                     for tmp in val:
                         subOptStr = '--' + key + ' ' + tmp
                         subOptsList.append(subOptStr)
-                    optStr = ' '.join(subOptsList)
+                        optsList.append(subOptStr)
             elif key == 'require':
                 if type(val) == str:
                     optStr = '--' + key + ' ' + val
@@ -340,15 +338,15 @@ def getAdocString(optsDict):
                     for req in val:
                         subOptStr = '--' + key + ' ' + req
                         subOptsList.append(subOptStr)
-                    optStr = ' '.join(subOptsList)
-            elif val == True:
-                optStr = '--' + key
-            elif type(val) != bool:
-                optStr = '--' + key + ' ' + val
+                        optsList.append(subOptStr)
+            else:
+                if val == True:
+                    optStr = '--' + key
+                elif type(val) != bool:
+                    optStr = '--' + key + ' ' + val
+                optsList.append(optStr)
 
-        optsList.append(optStr)
-        optString = ' '.join(optsList)
-    return optString
+    return optsList
 
 def makePlainBody(inBody, settings):
 
@@ -362,7 +360,7 @@ def makePlainBody(inBody, settings):
     # asciidoctor
     if informat == 'asciidoctor':
         adocSettings = getAdocString(settings['asciidoctor_options'].value)
-        adocCmd = ['asciidoctor', adocSettings, '-b', 'docbook', '-o', '-', '-']
+        adocCmd = ['asciidoctor', '-b', 'docbook', '-o', '-', '-'] + adocSettings 
         pandocIn = convert(adocCmd, inBody)
         informat = 'docbook'
     else:
@@ -379,7 +377,7 @@ def makeHtmlBody(inBody, settings):
 
     if informat == 'asciidoctor':
         adocSettings = getAdocString(settings['asciidoctor_options'].value)
-        cmd = ['asciidoctor', adocSettings, '-o', '-', '-']
+        cmd = ['asciidoctor', '-o', '-', '-'] + adocSettings 
     else:
         cmd = ['pandoc', '-f', informat, '-t', 'html']
 
