@@ -385,7 +385,7 @@ def makeHtmlBody(inBody, settings):
 
     return htmlBody
 
-def makeAltMessage(inBody, settings):
+def makeMessageParts(inBody, settings):
 
     # correct encoding
     if isinstance(inBody, str):
@@ -399,22 +399,19 @@ def makeAltMessage(inBody, settings):
     plainBody = makePlainBody(inBody, settings).decode('utf-8')
     htmlBody  = makeHtmlBody(inBody, settings).decode('utf-8')
 
-    # make plaintext version primary part of new outPart
-    outPart = MIMEPart()
-    outPart.set_content(plainBody)
-
-    # make it a multipart/alternative and add the htmlBody
-    # (add_alternative() converts non-multipart messages for you)
-    outPart.add_alternative(htmlBody, subtype='html')
-
-    return outPart
+    return plainBody, htmlBody
 
 def makeMultiMessage(inMessage, settings):
 
     # messages with attachments
     if inMessage.get_content_type() == 'multipart/mixed':
         inBody = (inMessage.get_body()).get_content()
-        altBody = makeAltMessage(inBody, settings)
+        plainBody, htmlBody = makeMessageParts(inBody, settings)
+
+        # make the multipart/alternative body
+        altBody = MIMEPart()
+        altBody.set_content(plainBody)
+        altBody.add_alternative(htmlBody, subtype='html')
         
         outMessage = EmailMessage(policy=default)    
 
@@ -432,9 +429,10 @@ def makeMultiMessage(inMessage, settings):
     # other messages
     else:
         inBody = inMessage.get_content()
-        altBody = makeAltMessage(inBody, settings)
-        outMessage = inMessage
-        outMessage.set_content(altBody)
+        plainBody, htmlBody = makeMessageParts(inBody, settings)
+        outMessage = inMessage # get an EmailMessage with the right header quickly
+        outMessage.set_content(plainBody)
+        outMessage.add_alternative(htmlBody, subtype='html')
     
     return outMessage
 
