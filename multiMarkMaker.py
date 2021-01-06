@@ -6,6 +6,7 @@ import toml
 import os
 import os.path
 import itertools
+import shlex
 from collections import OrderedDict
 import subprocess
 from subprocess import Popen, PIPE, STDOUT
@@ -360,7 +361,8 @@ def makePlainBody(inBody, settings):
     # asciidoctor
     if informat == 'asciidoctor':
         adocSettings = getAdocString(settings['asciidoctor_options'].value)
-        adocCmd = ['asciidoctor', '-b', 'docbook', '-o', '-', '-'] + adocSettings 
+        adocOpsString = shlex.split(settings['asciidoctor_options_string'].value)
+        adocCmd = ['asciidoctor', '-b', 'docbook', '-o', '-', '-'] + adocSettings + adocOpsString
         pandocIn = convert(adocCmd, inBody)
         informat = 'docbook'
     else:
@@ -377,7 +379,8 @@ def makeHtmlBody(inBody, settings):
 
     if informat == 'asciidoctor':
         adocSettings = getAdocString(settings['asciidoctor_options'].value)
-        cmd = ['asciidoctor', '-o', '-', '-'] + adocSettings 
+        adocOpsString = shlex.split(settings['asciidoctor_options_string'].value)
+        cmd = ['asciidoctor', '-o', '-', '-'] + adocSettings + adocOpsString
     else:
         cmd = ['pandoc', '-f', informat, '-t', 'html']
 
